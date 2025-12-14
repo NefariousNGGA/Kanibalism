@@ -16,6 +16,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // --- Auth Routes ---
 
   app.post("/api/auth/register", async (req, res) => {
     try {
@@ -68,6 +69,45 @@ export async function registerRoutes(
       res.status(500).json({ message: "Login failed" });
     }
   });
+
+  // --- Profile Route (Requires Auth) ---
+
+  app.patch("/api/profile", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { displayName, bio, avatarUrl } = req.body;
+
+      // Basic validation (you can expand this)
+      if (displayName !== undefined && typeof displayName !== 'string') {
+        return res.status(400).json({ message: "Display name must be a string" });
+      }
+      if (bio !== undefined && typeof bio !== 'string') {
+        return res.status(400).json({ message: "Bio must be a string" });
+      }
+      if (avatarUrl !== undefined && typeof avatarUrl !== 'string') {
+        return res.status(400).json({ message: "Avatar URL must be a string" });
+      }
+
+      const updatedUser = await storage.updateUserProfile(req.user!.id, {
+        displayName,
+        bio,
+        avatarUrl,
+      });
+
+      if (!updatedUser) {
+        return res.status(500).json({ message: "Failed to update profile" });
+      }
+
+      // Return the updated user info (excluding password)
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // --- Thoughts Routes ---
 
   app.get("/api/thoughts", async (req, res) => {
     try {
@@ -177,6 +217,8 @@ export async function registerRoutes(
     }
   });
 
+  // --- Tags Routes ---
+
   app.get("/api/tags", async (req, res) => {
     try {
       const tagsWithCount = await storage.getTags();
@@ -199,6 +241,8 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to fetch tag" });
     }
   });
+
+  // --- Stats Routes ---
 
   app.get("/api/stats", async (req, res) => {
     try {
