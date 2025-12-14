@@ -59,7 +59,7 @@ export function Header() {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            
+
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -71,7 +71,15 @@ export function Header() {
                   >
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="text-xs font-medium">
-                        {user.displayName?.[0] || user.username[0].toUpperCase()}
+                        {user.avatarUrl ? (
+                          <img
+                            src={user.avatarUrl}
+                            alt="User Avatar"
+                            className="h-full w-full rounded-full object-cover"
+                          />
+                        ) : (
+                          (user.displayName || user.username)?.charAt(0).toUpperCase() || "?"
+                        )}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -94,6 +102,7 @@ export function Header() {
                       New Thought
                     </DropdownMenuItem>
                   </Link>
+                  {/* NEW: Add Profile Link */}
                   <Link href="/profile">
                     <DropdownMenuItem data-testid="link-profile">
                       <User className="mr-2 h-4 w-4" />
@@ -178,6 +187,21 @@ export function Header() {
                     data-testid="link-mobile-register"
                   >
                     Get started
+                  </Button>
+                </Link>
+              </>
+            )}
+            {/* NEW: Add Profile Link for Mobile */}
+            {user && (
+              <>
+                <Link href="/profile">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => setIsMenuOpen(false)}
+                    data-testid="link-mobile-profile"
+                  >
+                    Profile
                   </Button>
                 </Link>
               </>
