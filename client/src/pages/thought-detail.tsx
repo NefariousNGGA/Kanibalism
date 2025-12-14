@@ -10,6 +10,7 @@ import { Footer } from "@/components/footer";
 import { formatDate } from "@/lib/utils";
 import type { ThoughtWithAuthor } from "@shared/schema";
 
+// Define a simple skeleton for the main content area
 function ThoughtDetailSkeleton() {
   return (
     <div className="py-12 md:py-16">
@@ -44,23 +45,54 @@ function ThoughtDetailSkeleton() {
   );
 }
 
+// Define a type for the error state if needed, though useQuery error is usually sufficient
+// type FetchError = { message: string; status?: number };
+
 export default function ThoughtDetail() {
   const [, params] = useRoute("/thoughts/:slug");
   const slug = params?.slug;
 
-  console.log("ThoughtDetail: Slug extracted:", slug); // Debug log
+  // Define the query function inline or use a centralized API client if available
+  // This function fetches the thought by its slug
+  const fetchThought = async ({ queryKey }: { queryKey: [string, string | undefined] }): Promise<ThoughtWithAuthor | null> => {
+    const [, slug] = queryKey;
+    if (!slug) {
+      throw new Error("Slug is required to fetch a thought.");
+    }
 
-  const {  thought, isLoading, error, isFetching } = useQuery({
-    queryKey: ["/api/thoughts", slug],
-    enabled: !!slug, // Only run query if slug exists
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    const response = await fetch(`/api/thoughts/${slug}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        // Return null for 404 to distinguish from other errors
+        return null;
+      }
+      // Throw a generic error for other non-2xx responses
+      const errorText = await response.text(); // Get error details from response body if possible
+      throw new Error(`Failed to fetch thought: ${response.status} - ${errorText}`);
+    }
+
+    return response.json();
+  };
+
+  // Use React Query to fetch the thought data
+  const {
+    data: thought,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["/api/thoughts", slug], // Query key includes the slug
+    queryFn: fetchThought,
+    enabled: !!slug, // Only run the query if a slug is present in the URL
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    cacheTime: 10 * 60 * 1000, // Cache data for 10 minutes
+    // Refetch on window focus is disabled by default, which is usually fine.
+    // You could enable it with refetchOnWindowFocus: true if needed.
   });
 
-  console.log("ThoughtDetail: Query state - isLoading:", isLoading, "isFetching:", isFetching, "error:", error, "thought (type):", typeof thought, "thought (value):", thought); // Debug log
-
+  // Handle loading state
   if (isLoading) {
-    console.log("ThoughtDetail: Showing loading skeleton"); // Debug log
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -72,13 +104,33 @@ export default function ThoughtDetail() {
     );
   }
 
-  // Check for error from the query *or* if thought is still undefined after loading completes
-  if (error || (typeof thought === 'undefined')) {
-    console.error("ThoughtDetail: Query Error or thought is undefined:", error, slug); // Log the error object and slug
-    // Log the error's message and stack if available
-    if (error) {
-      console.error("ThoughtDetail: Error details - message:", (error as any).message || 'No message', "stack:", (error as any).stack || 'No stack');
-    }
+  // Handle error state (network issues, 500 errors, etc.)
+  if (isError) {
+    console.error("Error fetching thought:", error); // Log error details for debugging (visible in browser console if accessible)
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 py-12 md:py-16">
+          <div className="max-w-2xl mx-auto px-6 md:px-8 text-center">
+            <Card className="p-12 border-0 bg-card">
+              <h2 className="font-serif text-2xl font-semibold mb-4">Error Loading Thought</h2>
+              <p className="text-muted-foreground mb-6">
+                There was a problem retrieving this thought. Please try again later.
+              </p>
+              <Link href="/thoughts">
+                <Button variant="outline">Browse All Thoughts</Button>
+              </Link>
+            </Card>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Handle the case where the thought was not found (API returned 404, fetchThought returned null)
+  if (!thought) {
+    console.warn(`Thought with slug '${slug}' not found.`); // Log warning for debugging
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -100,36 +152,12 @@ export default function ThoughtDetail() {
     );
   }
 
-  // Check if thought is null (separate check)
-  if (!thought) {
-     console.error("ThoughtDetail: Thought is null after loading/error checks:", slug); // Log for debugging
-     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <Header />
-        <main className="flex-1 py-12 md:py-16">
-          <div className="max-w-2xl mx-auto px-6 md:px-8 text-center">
-            <Card className="p-12 border-0 bg-card">
-              <h2 className="font-serif text-2xl font-semibold mb-4">Thought Not Found</h2>
-              <p className="text-muted-foreground mb-6">
-                The thought you are looking for may have been removed or the link might be incorrect.
-              </p>
-              <Link href="/thoughts">
-                <Button variant="outline">Browse All Thoughts</Button>
-              </Link>
-            </Card>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
+  // If we reach here, the thought data is successfully loaded and not null.
+  const { title, content, author, tags, createdAt, readingTime, viewCount } = thought;
 
-  // If we get here, 'thought' is an object.
-  console.log("ThoughtDetail: Rendering thought:", thought.title); // Debug log
-
-  // Use optional chaining or provide fallbacks for nested properties just in case
-  const author = thought.author || { username: "Unknown", displayName: "Unknown" };
-  const tags = thought.tags || [];
+  // Provide fallbacks for potentially missing author details
+  const authorName = author?.displayName || author?.username || "Anonymous";
+  const authorInitial = (authorName[0] || "?").toUpperCase();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -137,32 +165,36 @@ export default function ThoughtDetail() {
       <main className="flex-1">
         <article className="py-12 md:py-16">
           <div className="max-w-2xl mx-auto px-6 md:px-8">
+            {/* Back Button */}
             <Link href="/thoughts">
               <Button variant="ghost" size="sm" className="mb-8" data-testid="button-back">
                 <ArrowLeft className="mr-2 h-4 w-4" /> All thoughts
               </Button>
             </Link>
+
+            {/* Header Section (Title, Meta, Tags) */}
             <header className="mb-12">
               <h1 className="font-serif text-3xl md:text-4xl lg:text-5xl font-semibold leading-tight mb-6">
-                {thought.title || "Untitled Thought"}
+                {title || "Untitled Thought"} {/* Fallback if title is somehow missing */}
               </h1>
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground font-mono mb-6">
                 <span className="flex items-center gap-1.5">
                   <Calendar className="h-4 w-4" />
-                  {formatDate(thought.createdAt || new Date())}
+                  {formatDate(createdAt)}
                 </span>
                 <span className="text-border">|</span>
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-4 w-4" />
-                  {thought.readingTime || 0} min read
+                  {readingTime || 0} min read
                 </span>
                 <span className="text-border">|</span>
                 <span className="flex items-center gap-1.5">
                   <Eye className="h-4 w-4" />
-                  {thought.viewCount || 0} views
+                  {viewCount || 0} views
                 </span>
               </div>
-              {tags.length > 0 && (
+              {/* Render Tags */}
+              {tags && tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {tags.map((tag) => (
                     <Link key={tag.id} href={`/tags/${tag.slug}`}>
@@ -174,24 +206,29 @@ export default function ThoughtDetail() {
                 </div>
               )}
             </header>
+
+            {/* Main Content */}
             <div className="prose prose-lg dark:prose-invert max-w-none font-serif">
               <div
                 className="leading-relaxed text-foreground/90 whitespace-pre-wrap"
                 style={{ lineHeight: "1.8" }}
               >
-                {thought.content} {/* Render content directly, if it's null/undefined, it will be blank, not "No content available." */}
+                {/* Render content, handling potential null/undefined */}
+                {typeof content === 'string' && content.length > 0 ? content : "No content available for this thought."}
               </div>
             </div>
+
+            {/* Footer (Author Info) */}
             <footer className="mt-16 pt-8 border-t border-border">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                   <span className="text-lg font-medium">
-                    {author.displayName?.[0]?.toUpperCase() || author.username?.[0]?.toUpperCase() || "?"}
+                    {authorInitial}
                   </span>
                 </div>
                 <div>
                   <p className="font-medium">
-                    {author.displayName || author.username}
+                    {authorName}
                   </p>
                   <p className="text-sm text-muted-foreground">Author</p>
                 </div>
