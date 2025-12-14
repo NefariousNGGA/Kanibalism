@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { ThoughtCard, ThoughtCardSkeleton } from "@/components/thought-card";
+// import { ThoughtCard, ThoughtCardSkeleton } from "@/components/thought-card"; // Not used here, commented out
 import { formatDate } from "@/lib/utils";
 import type { ThoughtWithAuthor } from "@shared/schema";
 
@@ -17,21 +17,21 @@ function ThoughtDetailSkeleton() {
     <div className="py-12 md:py-16">
       <div className="max-w-2xl mx-auto px-6 md:px-8">
         <div className="mb-8">
-          <Skeleton className="h-8 w-3/4 mb-4" /> {/* Title */}
+          <Skeleton className="h-8 w-full mb-4" /> {/* Title */}
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground font-mono mb-6">
             <div className="flex items-center gap-1.5">
               <Skeleton className="h-4 w-4" />
-              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <div className="text-border">|</div>
+            <div className="flex items-center gap-1.5">
+              <Skeleton className="h-4 w-4" />
+              <Skeleton className="h-4 w-20" />
             </div>
             <div className="text-border">|</div>
             <div className="flex items-center gap-1.5">
               <Skeleton className="h-4 w-4" />
               <Skeleton className="h-4 w-16" />
-            </div>
-            <div className="text-border">|</div>
-            <div className="flex items-center gap-1.5">
-              <Skeleton className="h-4 w-4" />
-              <Skeleton className="h-4 w-12" />
             </div>
           </div>
           <div className="flex flex-wrap gap-2 mb-4">
@@ -39,8 +39,8 @@ function ThoughtDetailSkeleton() {
             <Skeleton className="h-6 w-20 rounded-full" />
           </div>
         </div>
-        <Skeleton className="h-64 w-full mb-4" /> {/* Content area */}
-        <Skeleton className="h-48 w-full" /> {/* More content area */}
+        <Skeleton className="h-64 w-full mb-4" />
+        <Skeleton className="h-48 w-full" />
       </div>
     </div>
   );
@@ -50,17 +50,21 @@ export default function ThoughtDetail() {
   const [, params] = useRoute("/thoughts/:slug");
   const slug = params?.slug;
 
+  console.log("ThoughtDetail component rendering, slug:", slug); // Debug log
+
   // Fetch the thought data, ensuring the query only runs if slug is available
-  const { data: thought, isLoading, error } = useQuery({
+  const { data: thought, isLoading, error, isFetching } = useQuery({
     queryKey: ["/api/thoughts", slug],
     enabled: !!slug, // Only run query if slug exists
-    // Optionally, add staleTime/cacheTime for better UX if data doesn't change frequently
-    // staleTime: 5 * 60 * 1000, // 5 minutes
-    // cacheTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Handle loading state
+  console.log("Query result - isLoading:", isLoading, "isFetching:", isFetching, "error:", error, "thought:", thought); // Debug log
+
+  // Handle loading state (initial load)
   if (isLoading) {
+    console.log("ThoughtDetail: Loading skeleton..."); // Debug log
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -72,9 +76,9 @@ export default function ThoughtDetail() {
     );
   }
 
-  // Handle error or missing thought
+  // Handle error or missing thought after data is fetched (or failed to fetch)
   if (error || !thought) {
-    console.error("Error fetching thought or thought not found:", error, slug); // Log for debugging
+    console.error("ThoughtDetail: Error or thought not found:", error, slug); // Log for debugging
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -96,10 +100,12 @@ export default function ThoughtDetail() {
     );
   }
 
-  // At this point, 'thought' is guaranteed to be defined due to the check above
-  // Use optional chaining (?.) or provide fallbacks for nested properties just in case
+  // At this point, 'thought' is guaranteed to be defined and fetched successfully
+  // Use optional chaining or provide fallbacks for nested properties just in case
   const author = thought.author || { username: "Unknown", displayName: "Unknown" }; // Fallback if author is missing
   const tags = thought.tags || []; // Fallback if tags are missing
+
+  console.log("ThoughtDetail: Rendering thought:", thought.title); // Debug log
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -114,24 +120,29 @@ export default function ThoughtDetail() {
             </Link>
             <header className="mb-12">
               <h1 className="font-serif text-3xl md:text-4xl lg:text-5xl font-semibold leading-tight mb-6">
-                {thought.title}
+                {/* Ensure thought.title exists */}
+                {thought.title || "Untitled Thought"}
               </h1>
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground font-mono mb-6">
                 <span className="flex items-center gap-1.5">
                   <Calendar className="h-4 w-4" />
-                  {formatDate(thought.createdAt)}
+                  {/* Ensure thought.createdAt exists and is a valid date */}
+                  {formatDate(thought.createdAt || new Date())}
                 </span>
                 <span className="text-border">|</span>
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-4 w-4" />
-                  {thought.readingTime} min read
+                  {/* Ensure thought.readingTime exists */}
+                  {thought.readingTime || 0} min read
                 </span>
                 <span className="text-border">|</span>
                 <span className="flex items-center gap-1.5">
                   <Eye className="h-4 w-4" />
-                  {thought.viewCount} views
+                  {/* Ensure thought.viewCount exists */}
+                  {thought.viewCount || 0} views
                 </span>
               </div>
+              {/* Render tags if they exist */}
               {tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {tags.map((tag) => (
@@ -144,23 +155,27 @@ export default function ThoughtDetail() {
                 </div>
               )}
             </header>
+            {/* Render the main content */}
             <div className="prose prose-lg dark:prose-invert max-w-none font-serif">
               <div
                 className="leading-relaxed text-foreground/90 whitespace-pre-wrap"
                 style={{ lineHeight: "1.8" }}
               >
-                {thought.content}
+                {/* Ensure thought.content exists */}
+                {thought.content || "No content available."}
               </div>
             </div>
             <footer className="mt-16 pt-8 border-t border-border">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                   <span className="text-lg font-medium">
-                    {author.displayName?.[0] || author.username?.[0]?.toUpperCase() || "?"}
+                    {/* Safely access author initials */}
+                    {author.displayName?.[0]?.toUpperCase() || author.username?.[0]?.toUpperCase() || "?"}
                   </span>
                 </div>
                 <div>
                   <p className="font-medium">
+                    {/* Safely access author name */}
                     {author.displayName || author.username}
                   </p>
                   <p className="text-sm text-muted-foreground">Author</p>
@@ -169,22 +184,6 @@ export default function ThoughtDetail() {
             </footer>
           </div>
         </article>
-        {/* Optional: Related Thoughts Section */}
-        {/* You can add this section back later if desired */}
-        {/* <section className="py-16 bg-card/50 border-t border-border">
-          <div className="max-w-6xl mx-auto px-6 md:px-8">
-            <h2 className="font-serif text-2xl font-semibold mb-8">More Thoughts</h2>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {relatedThoughts && relatedThoughts.length > 0 ? (
-                relatedThoughts.slice(0, 3).map((relatedThought) => (
-                  <ThoughtCard key={relatedThought.id} thought={relatedThought} variant="compact" />
-                ))
-              ) : (
-                <p className="text-muted-foreground col-span-full text-center">No related thoughts found.</p>
-              )}
-            </div>
-          </div>
-        </section> */}
       </main>
       <Footer />
     </div>
