@@ -15,6 +15,7 @@ import Dashboard from "@/pages/dashboard";
 import Editor from "@/pages/editor";
 import TagsPage from "@/pages/tags";
 import NotFound from "@/pages/not-found";
+import Profile from "@/pages/profile"; // NEW: Import Profile page
 
 function Router() {
   return (
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/new" component={Editor} />
       <Route path="/edit/:id" component={Editor} />
       <Route path="/tags/:slug" component={TagsPage} />
+      <Route path="/profile" component={Profile} /> {/* NEW: Add Profile route */}
       <Route component={NotFound} />
     </Switch>
   );
