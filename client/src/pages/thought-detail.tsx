@@ -72,9 +72,13 @@ export default function ThoughtDetail() {
     );
   }
 
-  // Check for error or if thought is not found/loaded correctly after loading completes
+  // Check for error from the query *or* if thought is still undefined after loading completes
   if (error || (typeof thought === 'undefined')) {
-    console.error("ThoughtDetail: Error or thought is undefined:", error, slug); // Log for debugging
+    console.error("ThoughtDetail: Query Error or thought is undefined:", error, slug); // Log the error object and slug
+    // Log the error's message and stack if available
+    if (error) {
+      console.error("ThoughtDetail: Error details - message:", (error as any).message || 'No message', "stack:", (error as any).stack || 'No stack');
+    }
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -96,8 +100,7 @@ export default function ThoughtDetail() {
     );
   }
 
-  // At this point, 'thought' should be an object (or potentially null if the API returned 404 but error wasn't caught correctly by useQuery)
-  // Let's add a check for null as well.
+  // Check if thought is null (separate check)
   if (!thought) {
      console.error("ThoughtDetail: Thought is null after loading/error checks:", slug); // Log for debugging
      return (
@@ -171,7 +174,6 @@ export default function ThoughtDetail() {
                 </div>
               )}
             </header>
-            {/* Render the main content - Remove the fallback for content here to see if the object has content */}
             <div className="prose prose-lg dark:prose-invert max-w-none font-serif">
               <div
                 className="leading-relaxed text-foreground/90 whitespace-pre-wrap"
