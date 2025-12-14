@@ -5,19 +5,20 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id", { length: 36 }).primaryKey(), // ✅ removed .default(sql`gen_random_uuid()`)
+  id: varchar("id", { length: 36 }).primaryKey(), // No default, handled by app
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   displayName: text("display_name"),
-  bio: text("bio"),
-  avatarUrl: text("avatar_url"),
+  bio: text("bio"), // New field
+  avatarUrl: text("avatar_url"), // New field
   isAdmin: boolean("is_admin").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // updatedAt: timestamp("updated_at").defaultNow().notNull(), // Consider adding if needed
 });
 
 export const thoughts = pgTable("thoughts", {
-  id: varchar("id", { length: 36 }).primaryKey(), // ✅ removed .default(sql`gen_random_uuid()`)
+  id: varchar("id", { length: 36 }).primaryKey(), // No default, handled by app
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
   content: text("content").notNull(),
@@ -32,7 +33,7 @@ export const thoughts = pgTable("thoughts", {
 });
 
 export const tags = pgTable("tags", {
-  id: varchar("id", { length: 36 }).primaryKey(), // ✅ removed .default(sql`gen_random_uuid()`)
+  id: varchar("id", { length: 36 }).primaryKey(), // No default, handled by app
   name: text("name").notNull().unique(),
   slug: text("slug").notNull().unique(),
 });
@@ -42,7 +43,6 @@ export const thoughtTags = pgTable("thought_tags", {
   tagId: varchar("tag_id", { length: 36 }).references(() => tags.id, { onDelete: "cascade" }).notNull(),
 });
 
-// Relations (unchanged)
 export const usersRelations = relations(users, ({ many }) => ({
   thoughts: many(thoughts),
 }));
@@ -70,11 +70,13 @@ export const thoughtTagsRelations = relations(thoughtTags, ({ one }) => ({
   }),
 }));
 
-// Schemas (unchanged)
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   isAdmin: true,
+  avatarUrl: true, // Allow omitting during registration
+  bio: true,       // Allow omitting during registration
+  // updatedAt: true, // Add if you include updatedAt
 });
 
 export const loginSchema = z.object({
@@ -87,6 +89,7 @@ export const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   displayName: z.string().optional(),
+  // avatarUrl and bio are not part of registration schema
 });
 
 export const insertThoughtSchema = createInsertSchema(thoughts).omit({
@@ -101,7 +104,6 @@ export const insertTagSchema = createInsertSchema(tags).omit({
   id: true,
 });
 
-// Type exports (already correct)
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertThought = z.infer<typeof insertThoughtSchema>;
@@ -111,8 +113,7 @@ export type Tag = typeof tags.$inferSelect;
 export type ThoughtTag = typeof thoughtTags.$inferSelect;
 
 export type ThoughtWithAuthor = Thought & {
-  author: Pick<User, "id" | "username" | "displayName" | "avatarUrl">;
-  tags: Tag[];
+  author: Pick<User, "id" | "username" | "displayName" | "avatarUrl">; // Include avatarUrl in author pick
 };
 
 export type Stats = {
