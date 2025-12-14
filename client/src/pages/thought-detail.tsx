@@ -52,47 +52,64 @@ export default function ThoughtDetail() {
   const [, params] = useRoute("/thoughts/:slug");
   const slug = params?.slug;
 
+  // --- DEBUG LOGS ADDED ---
+  console.log("ThoughtDetail: Raw slug from URL params:", slug, "Type:", typeof slug);
+  const decodedSlug = slug ? decodeURIComponent(slug) : slug; // Decode the slug just in case
+  console.log("ThoughtDetail: Decoded slug:", decodedSlug);
+  // --- END DEBUG LOGS ---
+
   // Define the query function inline or use a centralized API client if available
   // This function fetches the thought by its slug
   const fetchThought = async ({ queryKey }: { queryKey: [string, string | undefined] }): Promise<ThoughtWithAuthor | null> => {
     const [, slug] = queryKey;
+    console.log("ThoughtDetail: Fetching thought with slug (in fetch function):", slug); // Debug log
     if (!slug) {
       throw new Error("Slug is required to fetch a thought.");
     }
 
-    const response = await fetch(`/api/thoughts/${slug}`);
+    // Use the decoded slug for the API call
+    const response = await fetch(`/api/thoughts/${decodedSlug}`);
+
+    console.log("ThoughtDetail: API call made to:", `/api/thoughts/${decodedSlug}`, "Response status:", response.status); // Debug log
 
     if (!response.ok) {
       if (response.status === 404) {
+        console.warn(`API returned 404 for slug: ${decodedSlug}`); // Debug log
         // Return null for 404 to distinguish from other errors
         return null;
       }
       // Throw a generic error for other non-2xx responses
       const errorText = await response.text(); // Get error details from response body if possible
+      console.error(`API returned error ${response.status} for slug: ${decodedSlug}`, errorText); // Debug log
       throw new Error(`Failed to fetch thought: ${response.status} - ${errorText}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    console.log("ThoughtDetail: API response data:", data); // Debug log
+    return data;
   };
 
   // Use React Query to fetch the thought data
   const {
-    data: thought,
+     thought,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ["/api/thoughts", slug], // Query key includes the slug
+    queryKey: ["/api/thoughts", decodedSlug], // Query key uses the decoded slug
     queryFn: fetchThought,
-    enabled: !!slug, // Only run the query if a slug is present in the URL
+    enabled: !!decodedSlug, // Only run the query if a decoded slug is present in the URL
     staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
     cacheTime: 10 * 60 * 1000, // Cache data for 10 minutes
     // Refetch on window focus is disabled by default, which is usually fine.
     // You could enable it with refetchOnWindowFocus: true if needed.
   });
 
+  console.log("ThoughtDetail: useQuery result - isLoading:", isLoading, "isError:", isError, "error:", error, "thought:", thought); // Debug log
+
   // Handle loading state
   if (isLoading) {
+    console.log("ThoughtDetail: Showing loading skeleton"); // Debug log
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -106,7 +123,7 @@ export default function ThoughtDetail() {
 
   // Handle error state (network issues, 500 errors, etc.)
   if (isError) {
-    console.error("Error fetching thought:", error); // Log error details for debugging (visible in browser console if accessible)
+    console.error("ThoughtDetail: Query Error:", error); // Log error details for debugging (visible in browser console if accessible)
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -130,7 +147,7 @@ export default function ThoughtDetail() {
 
   // Handle the case where the thought was not found (API returned 404, fetchThought returned null)
   if (!thought) {
-    console.warn(`Thought with slug '${slug}' not found.`); // Log warning for debugging
+    console.warn(`Thought with decoded slug '${decodedSlug}' not found.`); // Log warning for debugging
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
@@ -153,6 +170,7 @@ export default function ThoughtDetail() {
   }
 
   // If we reach here, the thought data is successfully loaded and not null.
+  console.log("ThoughtDetail: Rendering thought with data:", thought); // Debug log
   const { title, content, author, tags, createdAt, readingTime, viewCount } = thought;
 
   // Provide fallbacks for potentially missing author details
