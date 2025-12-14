@@ -7,6 +7,7 @@ interface AuthContextType {
   login: (user: User, token: string) => void;
   logout: () => void;
   token: string | null;
+  updateUserProfile: (profileData: Partial<Pick<User, 'displayName' | 'bio' | 'avatarUrl'>>) => Promise<void>; // New function
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,7 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem("auth_token");
     const storedUser = localStorage.getItem("auth_user");
-    
+
     if (storedToken && storedUser) {
       try {
         setToken(storedToken);
@@ -46,8 +47,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("auth_user");
   };
 
+  // NEW: Function to update user profile
+  const updateUserProfile = async (profileData: Partial<Pick<User, 'displayName' | 'bio' | 'avatarUrl'>>) => {
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update profile");
+      }
+
+      const updatedUser: User = await response.json();
+      setUser(updatedUser);
+      localStorage.setItem("auth_user", JSON.stringify(updatedUser)); // Update localStorage
+      return updatedUser;
+    } catch (error) {
+      console.error("Update profile error:", error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, token }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, token, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );
