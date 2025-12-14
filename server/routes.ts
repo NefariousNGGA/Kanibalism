@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+// Import sql and db from their respective files
+import { sql } from "drizzle-orm";
+import { db } from "./db"; // Adjust path if necessary
 import { storage } from "./storage";
 import {
   hashPassword,
@@ -16,6 +19,30 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // --- TEMPORARY: Database Schema Update Route ---
+  // This route adds the new 'avatarUrl' and 'bio' columns to the 'users' table.
+  // Call this route ONCE after deploying the code changes.
+  // Example: curl -X POST https://your-app.onrender.com/api/init-db-profile
+  // IMPORTANT: Remove this route from the code after running it successfully.
+  app.post("/api/init-db-profile", async (req, res) => {
+    console.log("Attempting to update database schema for profile fields...");
+    try {
+      // Add 'bio' column (TEXT type, can be NULL)
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;`);
+      console.log("Column 'bio' added/verified.");
+
+      // Add 'avatarUrl' column (TEXT type, can be NULL)
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;`);
+      console.log("Column 'avatar_url' added/verified.");
+
+      res.json({ success: true, message: "Database schema updated successfully for profile fields (bio, avatar_url)." });
+    } catch (error) {
+      console.error("Error updating database schema:", error);
+      res.status(500).json({ success: false, message: "Failed to update database schema.", error: (error as Error).message });
+    }
+  });
+
   // --- Auth Routes ---
 
   app.post("/api/auth/register", async (req, res) => {
